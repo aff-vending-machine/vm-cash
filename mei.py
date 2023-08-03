@@ -46,10 +46,69 @@ def MEI_info(serT):
 
 def MEI_status(serT):
     counter = 0
-    serT.write(unhexlify((constants.MEI_TUBE_POLL)))
+    serT.write(unhexlify((constants.MEI_TUBE_STATUS)))
     response = b''
     while counter < 5:
-        print("Sending MEI Tube Status...:", (constants.MEI_TUBE_POLL))
+        print("Sending MEI Tube Status...:", (constants.MEI_TUBE_STATUS))
+        inw8 = serT.inWaiting()
+        print("MEI Status inw8 = ",repr(inw8))
+        if inw8 > 0:
+            try:
+                response = serT.read_until('\r')
+                # response = response.decode('utf-8')
+                # response = "".join(response.split(' '))
+                # response = "".join(response.split('\r'))
+                # response = "".join(response.split('\n'))
+                # serT.flushInput()
+            except Exception as e:
+                print("Reader Exception in MEI Status Responding:"+str(e))
+                return False,False   ### No Response with Error!
+
+            print("MEI Status Resp = ",repr(response))
+            if response != b'':
+                '''
+                01 Escrow Request
+                02 Changer Payout Busy
+                03 No Credit
+                04 Defective Tube Sensor
+                05 Double Arrival
+                06 Acceptor Unplugged
+                07 Tube Jam
+                08 ROM Checksum Error
+                09 Coin Routing Error
+                0A Changer Busy
+                0B Changer was Reset
+                0C Coin Jam
+                21 Coin not recognized/slug. Returned
+                Upon startup one of these values below may be sent to the PC - These are the VMC Commands.
+                08 Reset
+                09 Status
+                0A Tube Status
+                0B Poll
+                0C Coin Type
+                0D Dispense
+                '''
+                # print("Baht1 Tube 1 = ",response[6:8], " Baht1 Tube 2 = ",response[9:11], " Baht5 Tube 1 = ",response[15:17], " Baht5 Tube 2 = ",response[18:20], " Baht10 Tube 1 = ",response[21:23])
+                # one_thb = int(response[6:8], 16) + int(response[9:11], 16)
+                # five_thb = int(response[15:17], 16) + int(response[18:20], 16)
+                # ten_thb = int(response[21:23], 16)
+
+                # result = {'baht1': one_thb,
+                #            'baht5': five_thb,
+                #            'baht10': ten_thb
+                #         }
+                return True, response.decode('utf-8')
+        else:
+            counter = counter + 1
+        time.sleep(0.5)
+    return False,True  ### No Response, No Error
+
+def MEI_paystatus(serT):
+    counter = 0
+    serT.write(unhexlify((constants.MEI_PAY_STATUS)))
+    response = b''
+    while counter < 5:
+        print("Sending MEI Tube Status...:", (constants.MEI_PAY_STATUS))
         inw8 = serT.inWaiting()
         print("MEI Status inw8 = ",repr(inw8))
         if inw8 > 0:
@@ -241,7 +300,8 @@ def MEI_paypay(serT,value):
         if inw8 > 0:
             print("inw8 :",inw8)
             try:
-                response = serT.read_until('\r')
+                # response = serT.read_until('\r')
+                response = serT.read(inw8)
                 response = response.decode('utf-8')
                 response = "".join(response.split(' '))
                 response = "".join(response.split('\r'))

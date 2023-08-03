@@ -13,10 +13,11 @@ serC = serial.Serial(
         )
 
 a = time.time()
-mei_sts = mei.MEI_paypay(serC, 5)
+mei_sts = mei.MEI_paypay(serC, 10)
 b = time.time()
 print("eee: ", b-a)
 time.sleep(2)
+mei_sts = mei.MEI_paystatus(serC)
 
 while(1):
     time.sleep(5)
