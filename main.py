@@ -9,7 +9,7 @@ import threading
 from queue import Queue
 
 log_format = "%(asctime)s - %(levelname)s:%(message)s"
-logging.basicConfig(level='WARNING', format=log_format)
+logging.basicConfig(level='INFO', format=log_format)
 
 serC = serial.Serial(
         "/dev/ttyUSB0",
@@ -254,7 +254,7 @@ api = falcon.App(middleware=falcon.CORSMiddleware(
 api.add_route('/api/v1/coin', CoinResource())
 
 '''
-fuser -k 8080/tcp
+fuser -k 80/tcp
 
 Linux:
 gunicorn -b :80 main:api

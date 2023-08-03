@@ -5,9 +5,6 @@ import json
 import logging
 import serial
 
-#logging.basicConfig(filename='/home/pi/Workspace/returnofthevending/log_mainV2/log_mei.log',level=logging.DEBUG,format='%(asctime)s %(message)s',datefmt='%m/%d/%Y %I:%M:%S %p')
-#logging.info('Start Main Program')
-
 def MEI_info(serT):
     counter = 0
     serT.write(unhexlify((constants.MEI_INFO)))
@@ -106,74 +103,6 @@ def MEI_status(serT):
         time.sleep(0.5)
     return False,True  ### No Response, No Error
 
-# def MEI_recv(serT):
-#     print("MEI Ready to Receive...")
-#     #logging.info("Ready to read data From MEI")
-#     try:
-#         inw8 = serT.inWaiting()
-#         if inw8 > 0:
-#             reader = serT.read_until('\r')
-#             # reader = "".join(reader.split('\n'))
-#             serT.flushInput()
-#             serT.flushOutput()
-#         else:
-#             reader = False
-#         coin = 0
-# #        dest = 'cashbox'
-#         dest = 'invalidcoin'
-#         list1B = ['40','41']
-#         if reader:
-# #            print("Coin Received, Data from MEI:", reader
-#             #logging.info("Received:", reader)
-#             if reader[:2] == "08":
-#                 if reader[3:5] in list1B:
-#                     coin = 1
-#                     dest = 'cashbox'
-#                     print("1 Baht, Coin Box")
-#                     #logging.info("1 Baht, Coin Box")
-#                 elif reader[3:5] == "50" or reader[3:5] == "51":
-#                     coin = 1
-#                     dest = 'tube'
-#                     print("1 Baht, Tube")
-#                     #logging.info("1 Baht, Tube")
-#                 elif reader[3:5] == "42":
-#                     coin = 2
-#                     dest = 'cashbox'
-#                     print("2 Baht, Coin Box")
-#                     #logging.info("2 Baht, Coin Box")
-#                 elif reader[3:5] == "43" or reader[3:5] == "44":
-#                     coin = 5
-#                     dest = 'cashbox'
-#                     print("5 Baht, Coin Box")
-#                     #logging.info("5 Baht, Coin Box")
-#                 elif reader[3:5] == "53" or reader[3:5] == "54":
-#                     coin = 5
-#                     dest = 'tube'
-#                     print("5 Baht, Tube")
-#                     #logging.info("5 Baht, Tube")
-#                 elif reader[3:5] == "45":
-#                     coin = 10
-#                     dest = 'cashbox'
-#                     print("10 Baht, Coin Box")
-#                     #logging.info("10 Baht, Coin Box")
-#                 elif reader[3:5] == "55":
-#                     coin = 10
-#                     dest = 'tube'
-#                     print("10 Baht, Tube")
-#                     #logging.info("10 Baht, Tube")
-#                 jsonStr = {'action':2, 'msg':str(coin), 'dest':dest}
-#                 return json.dumps(jsonStr)
-#             elif reader[:2] == "FF":
-#                 jsonStr = {'action': 2,'result': 'fail','description': 'failed please try again'}
-#                 return json.dumps(jsonStr)
-#         time.sleep(0.1)
-#     except Exception as e:
-#         print("Exception in mei recv thread")
-# #        time.sleep(2)
-#         jsonStr = {'action': 2,'result': 'fail','description': 'failed please try again'}
-#         return json.dumps(jsonStr)
-#         #logging.info("Exception in mei recv thread")
-
 def MEI_payout(serT,value):
     print("In MEI_Payout Thread")
     valueDec = int(float(value))
@@ -188,9 +117,35 @@ def MEI_payout(serT,value):
     reader = ''
     while time.time()-start < 0.7:
         inw8 = serT.inWaiting()
+        print("MEI Payout inw8 = ",repr(inw8))
         if inw8 > 0:
-            start = time.time()
-            reader = reader+ serT.read(inw8)
+            try:
+                response = serT.read_until('\r')
+                response = response.decode('utf-8')
+                response = "".join(response.split(' '))
+                response = "".join(response.split('\r'))
+                response = "".join(response.split('\n'))
+                serT.flushInput()
+            except Exception as e:
+                print("Reader Exception in MEI Payout Responding:"+str(e))
+                return False,False   ### No Response with Error!
+
+            print("MEI Status Resp = ",repr(response))
+            if response != b'':
+                if response[:2] == "FF":
+                    return True,False   ### Response, but Fail
+                elif response[:2] == "00":
+                    serT.flushInput()
+                    time.sleep(0.1)
+                    serT.write(unhexlify("0F03"))
+                    print("Sending: 0F03")
+                    time.sleep(0.4)
+                    return True,True    ### Response with Success
+        # inw8 = serT.inWaiting()
+        # if inw8 > 0:
+        #     print("inw8 :",inw8)
+        #     start = time.time()
+        #     reader = reader+ serT.read(inw8)
 
     if reader:
         print("Payout Resp:",reader)
@@ -208,9 +163,25 @@ def MEI_payout(serT,value):
     start = time.time()
     while time.time()-start < 1:
         inw8 = serT.inWaiting()
+        print("MEI Payout inw8 = ",repr(inw8))
         if inw8 > 0:
-            start = time.time()
-            reader = serT.readline()
+            try:
+                response = serT.read_until('\r')
+                response = response.decode('utf-8')
+                response = "".join(response.split(' '))
+                response = "".join(response.split('\r'))
+                response = "".join(response.split('\n'))
+                serT.flushInput()
+            except Exception as e:
+                print("Reader Exception in MEI Payout Responding:"+str(e))
+                return False,False   ### No Response with Error!
+
+            print("MEI Status Resp22222 = ",repr(response))
+
+        # inw8 = serT.inWaiting()
+        # if inw8 > 0:
+        #     start = time.time()
+        #     reader = serT.readline()
 
     isPayout = False
 
@@ -255,6 +226,41 @@ def MEI_payout(serT,value):
     else:
         print("Payout 0F03 Timeout...")
         return False,None
+
+def MEI_paypay(serT,value):
+    counter = 0
+    valueDec = int(float(value))
+    valueHex = hex(valueDec).split('x')[-1]
+    serT.write(unhexlify("0F02"+str(valueHex).zfill(2)))
+    print("Sending:","0F02"+str(valueHex).zfill(2))
+    # serT.write(unhexlify((constants.MEI_DISABLE_ALL_COIN)))
+    response = b''
+    while counter < 3:
+        # print("Sending DISABLE:", (constants.MEI_DISABLE_ALL_COIN))
+        inw8 = serT.inWaiting()
+        if inw8 > 0:
+            print("inw8 :",inw8)
+            try:
+                response = serT.read_until('\r')
+                response = response.decode('utf-8')
+                response = "".join(response.split(' '))
+                response = "".join(response.split('\r'))
+                response = "".join(response.split('\n'))
+                serT.flushInput()
+            except Exception as e:
+                print("Reader Exception in MEI DISABLE Responding:"+str(e))
+                return False,False   ### No Response with Error!
+
+            print("MEI DISABLE Resp = ",repr(response))
+            if response != b'':
+                if response[:2] == "FF":
+                    return True,False   ### Response, but Fail
+                elif response[:2] == "00":
+                    return True,True    ### Response with Success
+        else:
+            counter = counter + 1
+        time.sleep(0.01)
+    return False,True  ### No Response, No Error
 
 def MEI_Disable(serT):
     counter = 0

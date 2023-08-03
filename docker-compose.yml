@@ -1,0 +1,18 @@
+version: '3.7'
+
+services:
+  cash-service:
+    build:
+      context: .
+    image: vending/cash-service:1.0.1
+    container_name: cash-service
+    restart: on-failure
+    ports:
+      - "80:8080"
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
+    logging:
+        driver: "json-file"
+        options:
+          max-size: "10M"
+          max-file: "20"
