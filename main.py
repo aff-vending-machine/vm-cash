@@ -58,7 +58,6 @@ def coin_collecting(timeout_queue, msg_queue, serT, cond):
             msg_queue.task_done()
 
         if coin_timeout > 0:
-            # print("Threadddddddddddddd: %s, %s | %s" % (thread_status, repr(previous_status), previous_status == ''))
             if thread_status == 'start':
                 if previous_status == '' or previous_status == 'stop':
                     startt = time.time()
@@ -83,7 +82,6 @@ def coin_collecting(timeout_queue, msg_queue, serT, cond):
                     list5b_tube = [b'53',b'54']
 
                     if reader:
-                        # print("Reader[:2]: %s ,Reader[3:5]: %s " % (reader[:2], reader[3:5]))
                         if reader[:2] == b'08':
                             if reader[3:5] in list1b_box:
                                 logging.info("1 Baht, Coin Box")
@@ -114,13 +112,11 @@ def coin_collecting(timeout_queue, msg_queue, serT, cond):
                     logging.error("Exception in mei recv thread: ",str(e))
 
             elif thread_status == 'stop'and previous_status == 'start':
-                # print("Thread Stopppppppppppp")
                 recv_value = coin_value
                 coin_timeout = 0
                 previous_status = thread_status
 
             elif thread_status == 'reset':
-                # print("Thread Stopppppppppppp")
                 recv_value = 0
                 coin_exchange_list = [0, 0, 0]
                 previous_status = thread_status
@@ -129,8 +125,8 @@ def coin_collecting(timeout_queue, msg_queue, serT, cond):
             # logging.info("Coin Value: %r | DiffTime: %r" % (recv_value, endt - startt))
             if (endt - startt) > coin_timeout:
                 coin_timeout = 0
-            time.sleep(0.1)
-        time.sleep(0.01)
+            time.sleep(0.05)
+        time.sleep(0.02)
 
 t = threading.Thread(target=coin_collecting, args=(timeout_queue, msg_queue, serC, cond,))
 threads.append(t)
@@ -191,7 +187,7 @@ class CoinResource:
                 mei_sts = mei.MEI_Enable(serC)
                 b = time.time()
                 global recv_value
-                recv_value = 0
+                # recv_value = 0
                 timeout_queue.put(coin_recv_timeout)
                 msg_queue.put('start')
             elif coin_cmd == 'disable':
@@ -208,20 +204,13 @@ class CoinResource:
                         'action': 1,
                         'messages': 'coin acceptor value reset successful'
                         }
-                # time.sleep(0.1)
-                # a = time.time()
-                # mei_sts = mei.MEI_Disable(serC)
-                # b = time.time()
-
             #### Action 2 ####
             elif coin_cmd == 'received':
                 resp_data = {
                         'success': True,
                         'action': 2,
                         'messages': 'coin received value successful',
-                        'value': recv_value
-                        # 'exchange_list': coin_exchange_list,
-                        # 'exchangeable': exchangeable_value
+                        'coin_value': recv_value
                         }
             elif coin_cmd == 'payout':
                 a = time.time()
@@ -261,8 +250,7 @@ class CoinResource:
                         'success': True,
                         'action': 1,
                         'messages': msgs,
-                        'value': recv_value,
-                        # 'exchange_list': coin_exchange_list,
+                        'coin_value': recv_value,
                         'time': b-a
                         }
             else:
@@ -277,7 +265,7 @@ class CoinResource:
                         }
 
         #### Action 2 ####
-        if coin_cmd == 'payout':
+        if coin_cmd == 'payout':    #### Need disable before payout
             if mei_sts[0]:
                 if mei_sts[1]:
                     if mei_sts[2]:
@@ -292,7 +280,7 @@ class CoinResource:
                         'success': True,
                         'action': 2,
                         'messages': msgs,
-                        'value': recv_value,
+                        'coin_value': recv_value,
                         # 'exchange_list': coin_exchange_list,
                         'time': b-a
                         }
