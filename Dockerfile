@@ -12,4 +12,4 @@ RUN python3 -m pip install -r requirements.txt
 
 RUN cp -r -f /usr/share/zoneinfo/Asia/Bangkok /etc/localtime
 
-CMD ["gunicorn", "-b", ":8080", "main:api", "-w", "2"]
+CMD ["gunicorn", "-b", ":8080", "main:api"]
