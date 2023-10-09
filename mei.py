@@ -356,59 +356,65 @@ def MEI_payout(serT, value):
 def MEI_Disable(serT):
     counter = 0
     serT.write(unhexlify((constants.MEI_DISABLE_ALL_COIN)))
-    response = b''
-    while counter < 3:
+    response = ''
+    while counter < 5:
         print("Sending DISABLE:", (constants.MEI_DISABLE_ALL_COIN))
         inw8 = serT.inWaiting()
         if inw8 > 0:
+            # print("inw8 = ",inw8)
             try:
-                response = serT.read_until('\r')
+                # response = serT.read_until('\r')
+                response = serT.readline()
+                # print("BEFORE DISABLE Resp = ",repr(response))
                 response = response.decode('utf-8')
                 response = "".join(response.split(' '))
                 response = "".join(response.split('\r'))
                 response = "".join(response.split('\n'))
-                serT.flushInput()
+                # serT.flushInput()
             except Exception as e:
                 print("Reader Exception in MEI DISABLE Responding:"+str(e))
                 return False,False   ### No Response with Error!
 
             print("MEI DISABLE Resp = ",repr(response))
-            if response != b'':
+            if response != '':
                 if response[:2] == "FF":
                     return True,False   ### Response, but Fail
                 elif response[:2] == "00":
                     return True,True    ### Response with Success
         else:
             counter = counter + 1
-        time.sleep(0.05)
+        time.sleep(0.1)
     return False,True  ### No Response, No Error
 
 def MEI_Enable(serT):
     counter = 0
     serT.write(unhexlify((constants.MEI_ENABLE_ALL_COIN)))
-    response = b''
-    while counter < 3:
+    response = ''
+    while counter < 5:
         print("Sending ENABLE:", (constants.MEI_ENABLE_ALL_COIN))
         inw8 = serT.inWaiting()
         if inw8 > 0:
+            # print("inw8 = ",inw8)
             try:
-                response = serT.read_until('\r')
+                # response = serT.read_until('\r')
+                response = serT.readline()
+                # print("BEFORE DISABLE Resp = ",repr(response))
                 response = response.decode('utf-8')
                 response = "".join(response.split(' '))
                 response = "".join(response.split('\r'))
                 response = "".join(response.split('\n'))
-                serT.flushInput()
+                # serT.flushInput()
             except Exception as e:
                 print("Reader Exception in MEI ENABLE Responding:"+str(e))
                 return False,False   ### No Response with Error!
 
             print("MEI ENABLE Resp = ",repr(response))
-            if response != b'':
+            if response != '':
                 if response[:2] == "FF":
                     return True,False   ### Response, but Fail
                 elif response[:2] == "00":
                     return True,True    ### Response with Success
         else:
             counter = counter + 1
-        time.sleep(0.05)
+        time.sleep(0.1)
     return False,True  ### No Response, No Error

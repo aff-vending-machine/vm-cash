@@ -5,6 +5,7 @@ import serial
 import time
 import datetime
 import mei
+import cba
 import threading
 from queue import Queue
 
@@ -25,8 +26,9 @@ cond = threading.Condition()
 timeout_queue = Queue()
 msg_queue = Queue()
 
-global recv_value, coin_exchange_list
-recv_value = 0
+global coin_recv_value, bill_recv_value, coin_exchange_list
+coin_recv_value = 0
+bill_recv_value = 0
 coin_exchange_list = [0, 0, 0]    #1,5,10
 
 coin_recv_timeout = 65
@@ -42,11 +44,9 @@ def coin_collecting(timeout_queue, msg_queue, serT, cond):
     coin_value = 0
     startt = 0
 
-    global recv_value, coin_exchange_list
+    global coin_recv_value, bill_recv_value, coin_exchange_list
     
-
     while True:
-        # print("IN Starttttttttt ")
         if not timeout_queue.empty():
             coin_timeout = timeout_queue.get()
             logging.info("coin_collecting got event: %s, | %s | %s" % (tname, coin_timeout, datetime.datetime.now().isoformat()))
@@ -62,67 +62,84 @@ def coin_collecting(timeout_queue, msg_queue, serT, cond):
                 if previous_status == '' or previous_status == 'stop':
                     startt = time.time()
                     coin_value = 0
+                    bill_value = 0
                     previous_status = thread_status
                 
                 try:
                     inw8 = serT.inWaiting()
                     if inw8 > 0:
-                        reader = serT.read_until('\r')
-                        # reader = "".join(reader.split('\n'))
-                        # serT.flushInput()
-                        # serT.flushOutput()
+                        serT.flushOutput()
+                        reader = serT.readline()
+                        reader = reader.decode('utf-8')
+                        reader = "".join(reader.split(' '))
+                        reader = "".join(reader.split('\r'))
+                        reader = "".join(reader.split('\n'))
+                        serT.flushInput()
                     else:
                         reader = False
 
-                    recv_value = coin_value
-                    # logging.info("Reader: %s | Coin_Value: %s | Coin_Timeout: %s" % (repr(reader), coin_value, coin_timeout))
-                    list1b_box = [b'40',b'41']
-                    list1b_tube = [b'50',b'51']
-                    list5b_box = [b'43',b'44']
-                    list5b_tube = [b'53',b'54']
+                    coin_recv_value = coin_value
+                    bill_recv_value = bill_value
+
+                    list1b_box = ['0840','0841']
+                    list1b_tube = ['0850','0851']
+                    list5b_box = ['0843','0844']
+                    list5b_tube = ['0853','0854']
+                    list10b_box = ['0845']
+                    list10b_tube = ['0855']
+
+                    list20b = ['3080']
+                    list50b = ['3081']
+                    list100b = ['3082']
+                    list500b = ['3083']
+                    list1000b = ['3084']
 
                     if reader:
-                        if reader[:2] == b'08':
-                            if reader[3:5] in list1b_box:
-                                logging.info("1 Baht, Coin Box")
-                                coin_value += 1
-                            elif reader[3:5] in list1b_tube:
-                                logging.info("1 Baht, Tube")
-                                coin_value += 1
-                                coin_exchange_list[0] += 1
-                            elif reader[3:5] == b'42':
-                                logging.info("2 Baht, Coin Box")
-                                coin_value += 2
-                            elif reader[3:5] in list5b_box:
-                                logging.info("5 Baht, Coin Box")
-                                coin_value += 5
-                            elif reader[3:5] in list5b_tube:
-                                logging.info("5 Baht, Tube")
-                                coin_value += 5
-                                coin_exchange_list[1] += 1
-                            elif reader[3:5] == b'45':
-                                logging.info("10 Baht, Coin Box")
-                                coin_value += 10
-                            elif reader[3:5] == b'55':
-                                logging.info("10 Baht, Tube")
-                                coin_value += 10
-                                coin_exchange_list[2] += 1
-                        recv_value = coin_value
+                        cash_value = reader[:4]
+                        if cash_value in list1b_box or cash_value in list1b_tube:
+                            logging.info("1 Baht")
+                            coin_value += 1
+                        elif cash_value in list5b_box or cash_value in list5b_tube:
+                            logging.info("5 Baht")
+                            coin_value += 5
+                        elif cash_value in list10b_box or cash_value in list10b_tube:
+                            logging.info("10 Baht")
+                            coin_value += 10
+
+                        elif cash_value in list20b:
+                            logging.info("20 Baht")
+                            bill_value += 20
+                        elif cash_value in list50b:
+                            logging.info("50 Baht")
+                            bill_value += 50
+                        elif cash_value in list100b:
+                            logging.info("100 Baht")
+                            bill_value += 100
+                        elif cash_value in list500b:
+                            logging.info("500 Baht")
+                            bill_value += 500
+                        elif cash_value in list1000b:
+                            logging.info("1000 Baht")
+                            bill_value += 1000
+
+                    coin_recv_value = coin_value
+                    bill_recv_value = bill_value
+
                 except Exception as e:
-                    logging.error("Exception in mei recv thread: ",str(e))
+                    logging.error("Exception in CBA recv thread: ",str(e))
 
             elif thread_status == 'stop'and previous_status == 'start':
-                recv_value = coin_value
+                coin_recv_value = coin_value
                 coin_timeout = 0
                 previous_status = thread_status
 
             elif thread_status == 'reset':
-                recv_value = 0
+                coin_recv_value = 0
                 coin_exchange_list = [0, 0, 0]
                 previous_status = thread_status
 
             endt = time.time()
-            # logging.info("Coin Value: %r | DiffTime: %r" % (recv_value, endt - startt))
+            # logging.info("Coin Value: %r | DiffTime: %r" % (coin_recv_value, endt - startt))
             if (endt - startt) > coin_timeout:
                 coin_timeout = 0
             time.sleep(0.05)
@@ -160,15 +177,16 @@ class CoinResource:
             falcon.HTTPStatus(status=200)
             return
 
-        logging.critical('dataReq: %r', dataReq)
+        logging.info('dataReq: %r', dataReq)
         coin_cmd = dataReq.get('command')
-        value_data = dataReq.get('value')
+        value_data = dataReq.get('change_value')
 
         ### define response data ###
         resp_data = {
             'success': False,
-            'messages': 'Wrong command'
+            'messages': 'Coin Wrong command'
             }
+        global coin_recv_value
         try:
             serC.flushInput()
             #### Action 0 ####
@@ -186,8 +204,6 @@ class CoinResource:
                 a = time.time()
                 mei_sts = mei.MEI_Enable(serC)
                 b = time.time()
-                global recv_value
-                # recv_value = 0
                 timeout_queue.put(coin_recv_timeout)
                 msg_queue.put('start')
             elif coin_cmd == 'disable':
@@ -210,7 +226,8 @@ class CoinResource:
                         'success': True,
                         'action': 2,
                         'messages': 'coin received value successful',
-                        'coin_value': recv_value
+                        'coin_value': coin_recv_value,
+                        'bill_value': bill_recv_value
                         }
             elif coin_cmd == 'payout':
                 a = time.time()
@@ -250,7 +267,7 @@ class CoinResource:
                         'success': True,
                         'action': 1,
                         'messages': msgs,
-                        'coin_value': recv_value,
+                        'coin_value': coin_recv_value,
                         'time': b-a
                         }
             else:
@@ -270,7 +287,7 @@ class CoinResource:
                 if mei_sts[1]:
                     if mei_sts[2]:
                         msgs = coin_cmd + ' - successful'
-                        recv_value = recv_value - mei_sts[2]
+                        coin_recv_value = coin_recv_value - mei_sts[2]
                     else:
                         msgs = coin_cmd + ' - fail, not enough exchange'    
                 else:
@@ -280,8 +297,7 @@ class CoinResource:
                         'success': True,
                         'action': 2,
                         'messages': msgs,
-                        'coin_value': recv_value,
-                        # 'exchange_list': coin_exchange_list,
+                        'coin_value': coin_recv_value,
                         'time': b-a
                         }
             else:
@@ -295,17 +311,100 @@ class CoinResource:
                         'messages': msgs
                         }
 
-        
         resp.text = json.dumps(resp_data)
         falcon.HTTPStatus(status=200)
         return
 
+class BillResource:
+    def on_get(self, req, resp):
+        resp_data = {
+                    'success': True, 
+                    'messages': 'Welcome to Bill Service'
+                    }
+        logging.critical("response_data.. : %r"% (resp_data))
+        resp.text = json.dumps(resp_data)
+        falcon.HTTPStatus(status=200)
+        return
+    
+    def on_post(self, req, resp):
+        try:
+            rawReq = req.bounded_stream.read().decode('utf-8')
+            dataReq = json.loads(rawReq)
+        except:
+            dataReq = json.loads("{}")
+            resp_data = {
+                        'success': False,
+                        'messages': 'Bill Service: Wrong param data'
+                        }
+            resp.text = json.dumps(resp_data)
+            falcon.HTTPStatus(status=200)
+            return
+
+        logging.info('Bill dataReq: %r', dataReq)
+        bill_cmd = dataReq.get('command')
+        bill_config = dataReq.get('config')
+
+        ### define response data ###
+        resp_data = {
+            'success': False,
+            'messages': 'Bill Wrong command'
+            }
+        global bill_recv_value
+        try:
+            serC.flushInput()
+            #### Action 1 ####
+            if bill_cmd == 'enable':
+                a = time.time()
+                bill_recv_value = 0
+                cba_sts = cba.CBA_Enable(serC, bill_config)
+                b = time.time()
+            elif bill_cmd == 'disable':
+                a = time.time()
+                cba_sts = cba.CBA_Disable(serC)
+                b = time.time()
+
+        except Exception as e:
+            logging.info("Bill Service: Error!: %r", e)
+            resp_data = {
+                        'success': False,
+                        'messages': 'Bill Service: Error'
+                        }
+
+        if bill_cmd == 'enable' or bill_cmd == 'disable':
+            if cba_sts[0]:
+                if cba_sts[1]:
+                    msgs = bill_cmd + ' - changed successful'
+                else:
+                    msgs = bill_cmd + ' - changed fail, try again..'
+                resp_data = {
+                        'success': True,
+                        'action': 1,
+                        'messages': msgs,
+                        'bill_value': bill_recv_value,
+                        'time': b-a
+                        }
+            else:
+                if cba_sts[1]:
+                    msgs = 'No Response'
+                else:
+                    msgs = 'Serial Error'
+                resp_data = {
+                        'success': False,
+                        'action': 1,
+                        'messages': msgs
+                        }
+
+        resp.text = json.dumps(resp_data)
+        falcon.HTTPStatus(status=200)
+        return
+    
 #### Falcon V3.0 ####
 api = falcon.App(cors_enable=True)
 api = falcon.App(middleware=falcon.CORSMiddleware(
     allow_origins='*', allow_credentials='*'))
 
 api.add_route('/api/v1/coin', CoinResource())
+api.add_route('/api/v1/bill', BillResource())
 
 '''
 fuser -k 80/tcp
